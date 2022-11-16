@@ -1,4 +1,12 @@
 module OpenAPIParser
+  class MultipleError < StandardError
+    attr_reader :errors
+
+    def initialize(errors)
+      @errors = errors
+    end
+  end
+
   class OpenAPIError < StandardError
     def initialize(reference)
       @reference = reference

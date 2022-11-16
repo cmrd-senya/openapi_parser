@@ -109,11 +109,14 @@ RSpec.describe OpenAPIParser::RequestOperation do
 
       it do
         expect { subject }.to raise_error do |e|
-          expect(e).to be_kind_of(OpenAPIParser::ValidateError)
+          expect(e).to be_kind_of(OpenAPIParser::MultipleError)
+          # expect(e).to be_kind_of(OpenAPIParser::ValidateError)
+          expect(e.errors.size).to eq(1)
+          error = e.errors.first
           if Gem::Version.create(RUBY_VERSION) <= Gem::Version.create('2.4.0')
-            expect(e.message).to end_with("expected string, but received Fixnum: 1")
+            expect(error.message).to end_with("expected string, but received Fixnum: 1")
           else
-            expect(e.message).to end_with("expected string, but received Integer: 1")
+            expect(error.message).to end_with("expected string, but received Integer: 1")
           end
         end
       end

@@ -60,6 +60,8 @@ class OpenAPIParser::SchemaValidator
   # @return [Object] coerced or original params
   def validate_data
     coerced, err = validate_schema(@value, @schema)
+    # binding.pry
+    raise OpenAPIParser::MultipleError, err if err.is_a? Array
     raise err if err
 
     coerced

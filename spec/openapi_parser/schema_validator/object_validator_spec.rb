@@ -1,9 +1,22 @@
 require_relative '../../spec_helper'
+require 'active_support'
+require 'active_support/core_ext'
 
 RSpec.describe OpenAPIParser::SchemaValidator::ObjectValidator do
-  before do
-    @validator = OpenAPIParser::SchemaValidator::ObjectValidator.new(nil, nil)
-    @root = OpenAPIParser.parse(
+  let(:value) do
+    {}
+  end
+
+  let(:schema_validator) do
+    OpenAPIParser::SchemaValidator.new(
+      value,
+      root,
+      OpenAPIParser::SchemaValidator::Options.new
+    )
+  end
+
+  let(:schema) do
+    {
       'openapi' => '3.0.0',
       'components' => {
         'schemas' => {
@@ -12,15 +25,118 @@ RSpec.describe OpenAPIParser::SchemaValidator::ObjectValidator do
             'required' => ['id'],
           },
         },
-      },
-    )
+      }
+    }
+  end
+
+  let(:root) do
+    OpenAPIParser.parse(schema)
+  end
+
+  before do
+    #binding.pry
+    @validator = OpenAPIParser::SchemaValidator::ObjectValidator.new(schema_validator, nil)
   end
 
   it 'shows error when required key is absent' do
-    schema = @root.components.schemas['object_with_required_but_no_properties']
-    _value, e = *@validator.coerce_and_validate({}, schema)
+    schema = root.components.schemas['object_with_required_but_no_properties']
+    _value, errors = *@validator.coerce_and_validate({}, schema)
 
+    e = errors.first
     expect(e&.message).to match('.* missing required parameters: id')
+  end
+
+  context 'complex object' do
+    let(:value) do
+      { 'foo' => {} }
+    end
+    let(:schema_validator) do
+      OpenAPIParser::SchemaValidator.new(
+        value,
+        root.paths.path['/nested_object'].operation(:post).request_body.content['application/json'].schema,
+        OpenAPIParser::SchemaValidator::Options.new
+      )
+    end
+
+    let(:schema) do
+      {
+        'openapi' => '3.0.0',
+        'paths' => {
+          '/nested_object': {
+            post: {
+              requestBody: {
+                content: {
+                  'application/json': {
+                    schema: {
+                      type: 'object',
+                      properties: {
+                        id: {
+                          type: 'integer'
+                        },
+                        foo: {
+                          type: 'object',
+                          required: %w[bar baz],
+                          properties: {
+                            bar: { type: 'string' },
+                            baz: { type: 'string' }
+                          }
+                        }
+                      },
+                      required: %w[id foo]
+                    }
+                  }
+                }
+              },
+              responses: {
+                '200': {
+                  content: {
+                    'application/json': {
+                      schema: {
+                        type: 'object',
+                        properties: {
+                          my_name: {
+                            type: 'string',
+                            nullable: false
+                          }
+                        },
+                        required: [
+                          'my_name'
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        'components' => {
+          'schemas' => {
+            'object_with_required_but_no_properties' => {
+              'type' => 'object',
+              'required' => ['id', 'foo'],
+              'properties' => {
+                'foo' => {
+                  'type' => 'object',
+                  'required' => ['bar', 'baz']
+                }
+              }
+            },
+          },
+        }
+      }.deep_stringify_keys
+    end
+
+    it 'shows error when required key is absent on different nesting levels' do
+      # binding.pry
+      schema_validator.validate_data
+      # schema = root.components.schemas['object_with_required_but_no_properties']
+      # _value, e = *@validator.coerce_and_validate({'foo' => {}}, schema)
+      rescue => e
+
+        #binding.pry
+      # expect(e&.message).to match('.* missing required parameters: id')
+    end
   end
 end
 

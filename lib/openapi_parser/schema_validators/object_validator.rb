@@ -22,6 +22,9 @@ class OpenAPIParser::SchemaValidator
         remaining_keys.delete('discriminator')
       end
 
+      errors = []
+
+      # binding.pry
       coerced_values = value.map do |name, v|
         s = properties[name]
         coerced, err = if s
@@ -33,7 +36,7 @@ class OpenAPIParser::SchemaValidator
                          [v, nil]
                        end
 
-        return [nil, err] if err
+        errors.concat(err) if err
 
         required_set.delete(name)
         [name, coerced]
@@ -44,9 +47,15 @@ class OpenAPIParser::SchemaValidator
       if !remaining_keys.empty? && !parent_all_of && !schema.additional_properties
         # If object is nested in all of, the validation is already done in allOf validator. Or if
         # additionalProperties are defined, we will validate using that
-        return [nil, OpenAPIParser::NotExistPropertyDefinition.new(remaining_keys, schema.object_reference)]
+        errors << OpenAPIParser::NotExistPropertyDefinition.new(remaining_keys, schema.object_reference)
       end
-      return [nil, OpenAPIParser::NotExistRequiredKey.new(required_set.to_a, schema.object_reference)] unless required_set.empty?
+
+      root_reference = schema.reference_from_schema_root
+      path_to_current_schema = root_reference.split('/properties/').join('.')
+
+      errors << OpenAPIParser::NotExistRequiredKey.new(required_set.to_a, path_to_current_schema) unless required_set.empty?
+
+      return [nil, errors] if errors.any?
 
       value.merge!(coerced_values.to_h) if @coerce_value
 

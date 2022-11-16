@@ -113,5 +113,21 @@ module OpenAPIParser::Schemas
     def additional_properties
       @additional_properties.nil? ? true : @additional_properties
     end
+
+    #def initialize(object_reference, parent, root, raw_schema)
+    #  super
+    #end
+
+    def schema_root_ancestor
+      schema = self
+      while schema.parent.is_a? OpenAPIParser::Schemas::Schema do
+        schema = schema.parent
+      end
+      schema
+    end
+
+    def reference_from_schema_root
+      object_reference.delete_prefix(schema_root_ancestor.object_reference)
+    end
   end
 end
